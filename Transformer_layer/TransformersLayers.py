@@ -229,4 +229,24 @@ class Transformer(keras.Model):
         Encoder_out = self.Encoder_(Position_Encoding_out)
         Decoder_out = self.Decoder_(inputs=Position_Encoding_out, encoder_outputs=Encoder_out)
         return self.Out_Put(Decoder_out)
-    
+
+
+
+if __name__ == "__main__":
+    # Define model hyperparameters
+    num_layers = 2
+    d_model = 128
+    dff = 512
+    num_heads = 4
+    vocab_size = 10000  # Adjust based on your dataset
+    max_len = 50  # Maximum sequence length
+
+    # Initialize Transformer Model
+    transformer = Transformer(
+        num_layers=num_layers,
+        dmodel=d_model,
+        dff=dff,
+        num_heads=num_heads,
+        vocab_size=vocab_size,
+        maxlen=max_len
+    )
