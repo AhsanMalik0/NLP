@@ -213,3 +213,20 @@ class Transformer_Out(keras.layers.Layer):
         return self.Dens(Decoder_output)
 
 
+class Transformer(keras.Model):
+    def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, dropout_rate=0.1, look_ahead_mask=None, padding_mask=None, Mask=None):
+        super(Transformer, self).__init__()
+        self.Mask = Mask
+        self.look_ahead_mask = look_ahead_mask
+        self.padding_mask = padding_mask
+        self.Positional_Encoding = PositionalEncoding(maxlen=maxlen, dmodel=dmodel)
+        self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff, maxlen=maxlen, num_heads=num_heads, dropout_rate=0.1)
+        self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff, num_heads=num_heads, maxlen=maxlen, dropout_rate=0.1)
+        self.Out_Put = Transformer_Out(vocab_size=vocab_size)
+    #
+    def call(self, Embeded_input):
+        Position_Encoding_out = self.Positional_Encoding(inputs)
+        Encoder_out = self.Encoder_(Position_Encoding_out)
+        Decoder_out = self.Decoder_(inputs=Position_Encoding_out, encoder_outputs=Encoder_out)
+        return self.Out_Put(Decoder_out)
+    
