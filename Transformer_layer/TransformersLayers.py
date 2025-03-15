@@ -196,12 +196,12 @@ class Decoder(keras.layers.Layer):
         #self.num_heads = num_heads
         #self.maxlen = maxlen
         #
-        self.encoder = [DecoderLayer(dff=dff, dmodel=dmodel,num_heads=num_heads, dropout_rate=0.1) for _ in range(num_layers)]
+        self.decoder = [DecoderLayer(dff=dff, dmodel=dmodel,num_heads=num_heads, dropout_rate=0.1) for _ in range(num_layers)]
     #
     def call(self, inputs, encoder_outputs, look_ahead_mask=None, padding_mask=None):
         dec_input = inputs
         for i in range(self.num_layers):
-            dec_input = self.encoder[i](decoder_input=dec_input, encoder_output=encoder_outputs)
+            dec_input = self.decoder[i](decoder_input=dec_input, encoder_output=encoder_outputs,  look_ahead_mask=None, padding_mask=None)
         return dec_input
 
 
@@ -214,27 +214,26 @@ class Transformer_Out(keras.layers.Layer):
 
 
 class Transformer(keras.Model):
-    def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, dropout_rate=0.1, look_ahead_mask=None, padding_mask=None, Mask=None):
+    def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, dropout_rate=0.1):
         super(Transformer, self).__init__()
-        self.Mask = Mask
-        self.look_ahead_mask = look_ahead_mask
-        self.padding_mask = padding_mask
         self.Positional_Encoding = PositionalEncoding(maxlen=maxlen, dmodel=dmodel)
         self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff, maxlen=maxlen, num_heads=num_heads, dropout_rate=0.1)
         self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff, num_heads=num_heads, maxlen=maxlen, dropout_rate=0.1)
         self.Out_Put = Transformer_Out(vocab_size=vocab_size)
     #
-    def call(self, Embeded_input):
-        Position_Encoding_out = self.Positional_Encoding(inputs)
-        Encoder_out = self.Encoder_(Position_Encoding_out)
-        Decoder_out = self.Decoder_(inputs=Position_Encoding_out, encoder_outputs=Encoder_out)
+    def call(self, Embeded_input, look_ahead_mask=None, padding_mask=None, Mask=None):
+        Position_Encoding_out = self.Positional_Encoding(Embeded_input)
+        Encoder_out = self.Encoder_(Position_Encoding_out, Mask=Mask)
+        Decoder_out = self.Decoder_(inputs=Position_Encoding_out, 
+                                    encoder_outputs=Encoder_out, 
+                                    look_ahead_mask=look_ahead_mask, padding_mask=padding_mask)
         return self.Out_Put(Decoder_out)
 
 
 
 if __name__ == "__main__":
     # Define model hyperparameters
-    num_layers = 2
+    num_layers = 96
     d_model = 128
     dff = 512
     num_heads = 4
@@ -250,3 +249,4 @@ if __name__ == "__main__":
         vocab_size=vocab_size,
         maxlen=max_len
     )
+
