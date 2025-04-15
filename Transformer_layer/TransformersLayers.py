@@ -216,18 +216,27 @@ class Transformer_Out(keras.layers.Layer):
 class Transformer(keras.Model):
     def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, dropout_rate=0.1):
         super(Transformer, self).__init__()
+        self.Embedding = keras.layers.Embedding(vocab_size, dmodel)
         self.Positional_Encoding = PositionalEncoding(maxlen=maxlen, dmodel=dmodel)
-        self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff, maxlen=maxlen, num_heads=num_heads, dropout_rate=0.1)
-        self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff, num_heads=num_heads, maxlen=maxlen, dropout_rate=0.1)
+        self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff, maxlen=maxlen, num_heads=num_heads, dropout_rate=dropout_rate)
+        self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff, num_heads=num_heads, maxlen=maxlen, dropout_rate=dropout_rate)
         self.Out_Put = Transformer_Out(vocab_size=vocab_size)
-    #
-    def call(self, Embeded_input, look_ahead_mask=None, padding_mask=None, Mask=None):
-        Position_Encoding_out = self.Positional_Encoding(Embeded_input)
-        Encoder_out = self.Encoder_(Position_Encoding_out, Mask=Mask)
-        Decoder_out = self.Decoder_(inputs=Position_Encoding_out, 
-                                    encoder_outputs=Encoder_out, 
-                                    look_ahead_mask=look_ahead_mask, padding_mask=padding_mask)
-        return self.Out_Put(Decoder_out)
+ 
+    def call(self, inputs, training=False):
+        enc_inputs = inputs['inputs']     # encoder inputs
+        dec_inputs = inputs['dec_inputs'] # decoder inputs
+ 
+        # Embed and add positional encoding
+        enc_embed = self.Embedding(enc_inputs)
+        dec_embed = self.Embedding(dec_inputs)
+        enc_embed = self.Positional_Encoding(enc_embed)
+        dec_embed = self.Positional_Encoding(dec_embed)
+ 
+        # Pass through encoder and decoder
+        enc_output = self.Encoder_(enc_embed)
+        dec_output = self.Decoder_(dec_embed, encoder_outputs=enc_output)
+ 
+        return self.Out_Put(dec_output)
 
 
 
