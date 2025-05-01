@@ -212,32 +212,55 @@ class Transformer_Out(keras.layers.Layer):
     def call(self, Decoder_output):
         return self.Dens(Decoder_output)
 
+def create_padding_mask(seq):
+    mask = tf.cast(tf.math.equal(seq, 0), tf.float32)
+    return mask[:, tf.newaxis, tf.newaxis, :]  # shape: (batch_size, 1, 1, seq_len)
+
+def create_look_ahead_mask(size):
+    mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
+    return mask  # shape: (seq_len, seq_len)
+
+def create_combined_mask(seq):
+    look_ahead = create_look_ahead_mask(tf.shape(seq)[1])
+    padding = create_padding_mask(seq)
+    return tf.maximum(look_ahead, padding)
 
 class Transformer(keras.Model):
-    def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, dropout_rate=0.1):
+    def __init__(self, num_layers, dmodel, dff, num_heads, vocab_size, maxlen, masks=False, dropout_rate=0.1):
         super(Transformer, self).__init__()
+        self.masks = masks
         self.Embedding = keras.layers.Embedding(vocab_size, dmodel)
         self.Positional_Encoding = PositionalEncoding(maxlen=maxlen, dmodel=dmodel)
-        self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff, maxlen=maxlen, num_heads=num_heads, dropout_rate=dropout_rate)
-        self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff, num_heads=num_heads, maxlen=maxlen, dropout_rate=dropout_rate)
+        self.Encoder_ = Encoder(num_layers=num_layers, dmodel=dmodel, dff=dff,
+                                maxlen=maxlen, num_heads=num_heads, dropout_rate=dropout_rate)
+        self.Decoder_ = Decoder(num_layers=num_layers, dmodel=dmodel, dff=dff,
+                                num_heads=num_heads, maxlen=maxlen, dropout_rate=dropout_rate)
         self.Out_Put = Transformer_Out(vocab_size=vocab_size)
- 
-    def call(self, inputs, training=False):
-        enc_inputs = inputs['inputs']     # encoder inputs
-        dec_inputs = inputs['dec_inputs'] # decoder inputs
- 
-        # Embed and add positional encoding
-        enc_embed = self.Embedding(enc_inputs)
-        dec_embed = self.Embedding(dec_inputs)
-        enc_embed = self.Positional_Encoding(enc_embed)
-        dec_embed = self.Positional_Encoding(dec_embed)
- 
-        # Pass through encoder and decoder
-        enc_output = self.Encoder_(enc_embed)
-        dec_output = self.Decoder_(dec_embed, encoder_outputs=enc_output)
- 
-        return self.Out_Put(dec_output)
 
+    def call(self, inputs, training=False):
+        enc_inputs = inputs['inputs']
+        dec_inputs = inputs['dec_inputs']
+        # Create masks
+        if self.masks == True:
+            enc_padding_mask = create_padding_mask(enc_inputs)
+            look_ahead_mask = create_look_ahead_mask(tf.shape(dec_inputs)[1])
+            dec_target_padding_mask = create_padding_mask(dec_inputs)
+            combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
+        else:
+            enc_padding_mask = None
+            look_ahead_mask = None
+            combined_mask = None
+
+        enc_embed = self.Positional_Encoding(self.Embedding(enc_inputs))
+        dec_embed = self.Positional_Encoding(self.Embedding(dec_inputs))
+        
+        # Encoder and Decoder
+        enc_output = self.Encoder_(enc_embed, Mask=enc_padding_mask)
+        dec_output = self.Decoder_(dec_embed, encoder_outputs=enc_output,
+                                   look_ahead_mask=combined_mask,
+                                   padding_mask=enc_padding_mask)
+        
+        return self.Out_Put(dec_output)
 
 
 if __name__ == "__main__":
